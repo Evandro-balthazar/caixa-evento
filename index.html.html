@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tarde Gelada - Caixa & Estoque</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2, h3 { color: #2c3e50; margin-top: 0; text-align: center; }
+        
+        .painel-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .painel-grid { grid-template-columns: 1fr; } }
+
+        .card-secao { background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 6px; }
+
+        /* Grade de Botões com Estoque */
+        .grid-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .btn-produto { background: #3498db; color: white; border: none; padding: 12px 8px; cursor: pointer; border-radius: 6px; font-size: 14px; text-align: center; transition: background 0.2s; position: relative; }
+        .btn-produto:hover { background: #2980b9; }
+        .btn-produto:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .btn-produto span { display: block; font-size: 12px; margin-top: 4px; opacity: 0.9; }
+        .badge-estoque { display: block; font-size: 11px; background: rgba(0,0,0,0.2); margin-top: 5px; padding: 2px; border-radius: 3px; font-weight: bold; }
+
+        /* Área de controle manual */
+        .manual-box { background: #f1f2f6; padding: 10px; border-radius: 6px; border: 1px solid #dcdde1; }
+        .form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 90px; margin-bottom: 5px; }
+        label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px; }
+        input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        
+        button.btn-acao { background: #27ae60; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+        button.btn-acao:hover { background: #219653; }
+        
+        .btn-finalizar { background: #27ae60; width: 100%; padding: 12px; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .btn-finalizar:hover { background: #219653; }
+
+        .btn-export { background: #8e44ad; margin-top: 20px; width: 100%; padding: 12px; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        .btn-export:hover { background: #732d91; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        
+        .total-parcial { font-size: 18px; font-weight: bold; margin-top: 10px; text-align: right; color: #e67e22; }
+        .total-geral { font-size: 22px; font-weight: bold; margin-top: 20px; text-align: right; color: #27ae60; }
+        
+        .btn-remover { background: #e74c3c; color: white; border: none; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+        .btn-remover:hover { background: #c0392b; }
+        
+        .btn-imprimir { background: #d35400; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .btn-imprimir:hover { background: #ba4600; }
+
+        #print-area { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { display: block; position: absolute; left: 0; top: 0; width: 58mm; font-family: monospace; font-size: 12px; padding: 5px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Tarde Gelada - Sociedade de Cultura Espírita Maria Magdalena</h2>
+    <h3 style="color: #7f8c8d; font-size: 15px; margin-bottom: 20px;">Sistema de Caixa com Controle de Estoque</h3>
+
+    <div class="painel-grid">
+        <!-- COLUNA DA ESQUERDA: PRODUTOS E ESTOQUE -->
+        <div class="card-secao">
+            <h3>Cardápio & Estoque</h3>
+            <p style="font-size: 12px; color: #666; margin-top: 0;">Clique para adicionar ao pedido (mostra estoque restante):</p>
+            
+            <!-- GRADE DINÂMICA DE PRODUTOS -->
+            <div class="grid-produtos" id="grid-produtos">
+                <!-- Gerado via JavaScript baseado no estoque -->
+            </div>
+
+            <div class="manual-box">
+                <h3 style="font-size: 14px; margin-bottom: 8px;">Item Avulso / Personalizado</h3>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="p-nome">Nome:</label>
+                        <input type="text" id="p-nome" placeholder="Ex: Doce">
+                    </div>
+                    <div class="form-group">
+                        <label for="p-qtd">Qtd:</label>
+                        <input type="number" id="p-qtd" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="p-valor">R$:</label>
+                        <input type="number" id="p-valor" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+                <button class="btn-acao" style="margin-top: 8px; width: 100%;" onclick="adicionarManualAoPedido()">Adicionar ao Pedido</button>
+            </div>
+        </div>
+
+        <!-- COLUNA DA DIREITA: CARRINHO ATUAL -->
+        <div class="card-secao">
+            <h3>Pedido Atual (Comanda)</h3>
+            <div style="min-height: 150px; max-height: 250px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Qtd</th>
+                            <th>Subtotal</th>
+                            <th>X</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-carrinho">
+                        <!-- Itens do pedido atual -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="total-parcial" id="parcial-pedido">
+                Total do Pedido: R$ 0,00
+            </div>
+
+            <button class="btn-finalizar" onclick="finalizarEImprimir()">Finalizar e Imprimir Ticket 🖨️</button>
+        </div>
+    </div>
+
+    <h3 style="margin-top: 30px;">Histórico Geral de Vendas</h3>
+    <table>
+        <thead>
+            <tr>
+                <th># Venda</th>
+                <th>Itens do Pedido</th>
+                <th>Total da Venda</th>
+                <th>Horário</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="tabela-historico">
+            <!-- Vendas finalizadas -->
+        </tbody>
+    </table>
+
+    <div class="total-geral" id="valor-total-geral">
+        Total Geral Arrecadado: R$ 0,00
+    </div>
+
+    <button class="btn-export" onclick="exportarExcel()">Exportar Relatório Geral para Excel (CSV)</button>
+</div>
+
+<!-- ESTRUTURA OCULTA PARA IMPRESSÃO DO TICKET -->
+<div id="print-area">
+    <div style="text-align: center; font-weight: bold; font-size: 13px;">--- Tarde Gelada ---</div>
+    <div style="text-align: center; font-size: 10px; margin-bottom: 5px;">Sociedade de Cultura Espirita Maria Magdalena</div>
+    <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+    <div id="ticket-conteudo"></div>
+    <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+    <div style="text-align: center; margin-top: 6px; font-size: 10px;">Obrigado por contribuir com nosso Tarde Gelada!</div>
+</div>
+
+<script>
+    // ESTOQUE INICIAL DOS PRODUTOS (Você pode alterar os nomes, preços e quantidades aqui)
+    let produtosEstoque = JSON.parse(localStorage.getItem('estoque_tarde_gelada')) || [
+        { nome: 'Sorvete', preco: 3.99, qtdEstoque: 50 },
+        { nome: 'Água', preco: 3.00, qtdEstoque: 40 },
+        { nome: 'Refrigerante', preco: 5.00, qtdEstoque: 35 },
+        { nome: 'Pastel', preco: 8.50, qtdEstoque: 30 },
+        { nome: 'Coxinha', preco: 6.00, qtdEstoque: 25 }
+    ];
+
+    let carrinhoAtual = [];
+    let vendasHistorico = JSON.parse(localStorage.getItem('vendas_tarde_gelada')) || [];
+
+    function atualizarTela() {
+        // Atualiza a Grade de Produtos e Estoque na Tela
+        const gridProdutos = document.getElementById('grid-produtos');
+        gridProdutos.innerHTML = '';
+
+        produtosEstoque.forEach((p, index) => {
+            let btn = document.createElement('button');
+            btn.className = 'btn-produto';
+            let esgotado = p.qtdEstoque <= 0;
+            if (esgotado) btn.disabled = true;
+
+            btn.innerHTML = `
+                ${p.nome}
+                <span>R$ ${p.preco.toFixed(2)}</span>
+                <span class="badge-estoque">${esgotado ? 'ESGOTADO' : 'Restam: ' + p.qtdEstoque}</span>
+            `;
+            if (!esgotado) {
+                btn.onclick = () => adicionarAoPedido(index);
+            }
+            gridProdutos.appendChild(btn);
+        });
+
+        // Atualiza Carrinho Atual
+        const tbodyCarrinho = document.getElementById('tabela-carrinho');
+        tbodyCarrinho.innerHTML = '';
+        let totalParcial = 0;
+
+        carrinhoAtual.forEach((item, index) => {
+            let subtotal = item.quantidade * item.valor;
+            totalParcial += subtotal;
+
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.produto}</td>
+                <td><input type="number" value="${item.quantidade}" min="1" style="width: 45px; padding: 2px;" onchange="alterarQtdCarrinho(${index}, this.value)"></td>
+                <td>R$ ${subtotal.toFixed(2)}</td>
+                <td><button class="btn-remover" onclick="removerDoCarrinho(${index})">X</button></td>
+            `;
+            tbodyCarrinho.appendChild(tr);
+        });
+
+        document.getElementById('parcial-pedido').innerText = `Total do Pedido: R$ ${totalParcial.toFixed(2)}`;
+
+        // Atualiza Histórico Geral
+        const tbodyHistorico = document.getElementById('tabela-historico');
+        tbodyHistorico.innerHTML = '';
+        let totalGeral = 0;
+
+        vendasHistorico.forEach((venda, index) => {
+            totalGeral += venda.totalVenda;
+            let resumoItens = venda.itens.map(i => `${i.quantidade}x ${i.produto}`).join(', ');
+
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>#${index + 1}</td>
+                <td>${resumoItens}</td>
+                <td>R$ ${venda.totalVenda.toFixed(2)}</td>
+                <td>${venda.horario}</td>
+                <td>
+                    <button class="btn-imprimir" onclick="reimprimirVenda(${index})" title="Reimprimir Ticket">🖨️ Reimprimir</button>
+                </td>
+            `;
+            tbodyHistorico.appendChild(tr);
+        });
+
+        document.getElementById('valor-total-geral').innerText = `Total Geral Arrecadado: R$ ${totalGeral.toFixed(2)}`;
+        
+        // Salva dados locais
+        localStorage.setItem('estoque_tarde_gelada', JSON.stringify(produtosEstoque));
+        localStorage.setItem('vendas_tarde_gelada', JSON.stringify(vendasHistorico));
+    }
+
+    function adicionarAoPedido(produtoIndex) {
+        let prod = produtosEstoque[produtoIndex];
+
+        // Verifica se há estoque disponível considerando o que já está no carrinho atual
+        let jaNoCarrinho = carrinhoAtual.find(i => i.produto === prod.nome);
+        let qtdNoCarrinho = jaNoCarrinho ? jaNoCarrinho.quantidade : 0;
+
+        if (prod.qtdEstoque <= qtdNoCarrinho) {
+            alert('Estoque insuficiente para adicionar mais unidades deste item.');
+            return;
+        }
+
+        if (jaNoCarrinho) {
+            jaNoCarrinho.quantidade += 1;
+        } else {
+            carrinhoAtual.push({ produto: prod.nome, quantidade: 1, valor: prod.preco });
+        }
+        atualizarTela();
+    }
+
+    function adicionarManualAoPedido() {
+        const nome = document.getElementById('p-nome').value.trim();
+        const qtd = parseInt(document.getElementById('p-qtd').value);
+        const valor = parseFloat(document.getElementById('p-valor').value);
+
+        if (!nome || isNaN(qtd) || isNaN(valor) || qtd <= 0) {
+            alert('Preencha os campos do item avulso corretamente.');
+            return;
+        }
+
+        carrinhoAtual.push({ produto: nome, quantidade: qtd, valor: valor });
+
+        document.getElementById('p-nome').value = '';
+        document.getElementById('p-qtd').value = '1';
+        document.getElementById('p-valor').value = '';
+
+        atualizarTela();
+    }
+
+    function alterarQtdCarrinho(index, novaQtd) {
+        let qtd = parseInt(novaQtd);
+        let item = carrinhoAtual[index];
+        
+        // Se for produto do cardápio, verifica o estoque máximo
+        let prodEstoque = produtosEstoque.find(p => p.nome === item.produto);
+        if (prodEstoque && qtd > prodEstoque.qtdEstoque) {
+            alert(`Estoque máximo disponível para ${prodEstoque.nome} é ${prodEstoque.qtdEstoque}.`);
+            atualizarTela();
+            return;
+        }
+
+        if (qtd > 0) {
+            item.quantidade = qtd;
+        } else {
+            carrinhoAtual.splice(index, 1);
+        }
+        atualizarTela();
+    }
+
+    function removerDoCarrinho(index) {
+        carrinhoAtual.splice(index, 1);
+        atualizarTela();
+    }
+
+    function gerarHTMLTicket(vendaId, itens, totalVenda, horario) {
+        let ticketHTML = `
+            <div><b>Venda #${vendaId}</b></div>
+            <div>Horário: ${horario}</div>
+            <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        `;
+
+        itens.forEach(i => {
+            let sub = (i.quantidade * i.valor).toFixed(2);
+            ticketHTML += `<div>${i.quantidade}x ${i.produto}</div><div>  R$ ${i.valor.toFixed(2)} un (Sub: R$ ${sub})</div>`;
+        });
+
+        ticketHTML += `
+            <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+            <div style="font-size: 14px;"><b>TOTAL: R$ ${totalVenda.toFixed(2)}</b></div>
+        `;
+        return ticketHTML;
+    }
+
+    function finalizarEImprimir() {
+        if (carrinhoAtual.length === 0) {
+            alert('O carrinho atual está vazio.');
+            return;
+        }
+
+        // BAIXA NO ESTOQUE REAL
+        carrinhoAtual.forEach(itemCarrinho => {
+            let prod = produtosEstoque.find(p => p.nome === itemCarrinho.produto);
+            if (prod) {
+                prod.qtdEstoque -= itemCarrinho.quantidade;
+                if (prod.qtdEstoque < 0) prod.qtdEstoque = 0;
+            }
+        });
+
+        const agora = new Date().toLocaleTimeString();
+        let totalVenda = carrinhoAtual.reduce((sum, i) => sum + (i.quantidade * i.valor), 0);
+        
+        let novaVenda = {
+            itens: [...carrinhoAtual],
+            totalVenda: totalVenda,
+            horario: agora
+        };
+
+        vendasHistorico.push(novaVenda);
+        let vendaId = vendasHistorico.length;
+
+        // Preenche o ticket e dispara a impressão
+        document.getElementById('ticket-conteudo').innerHTML = gerarHTMLTicket(vendaId, novaVenda.itens, novaVenda.totalVenda, novaVenda.horario);
+        
+        // Limpa o carrinho atual para a próxima venda
+        carrinhoAtual = [];
+        atualizarTela();
+
+        window.print();
+    }
+
+    function reimprimirVenda(index) {
+        let venda = vendasHistorico[index];
+        document.getElementById('ticket-conteudo').innerHTML = gerarHTMLTicket(index + 1, venda.itens, venda.totalVenda, venda.horario);
+        window.print();
+    }
+
+    function exportarExcel() {
+        if (vendasHistorico.length === 0) {
+            alert('Não há vendas para exportar.');
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,ID Venda;Itens Consumidos;Total da Venda (R$);Horario\n";
+        
+        let qtdTotalItensConsumidos = 0;
+        let valorTotalArrecadado = 0;
+
+        vendasHistorico.forEach((v, index) => {
+            let resumoItens = v.itens.map(i => {
+                qtdTotalItensConsumidos += i.quantidade;
+                return `${i.quantidade}x ${i.produto}`;
+            }).join(' | ');
+
+            valorTotalArrecadado += v.totalVenda;
+            let totalVendaStr = v.totalVenda.toFixed(2).replace('.', ',');
+            
+            csvContent += `${index + 1};"${resumoItens}";${totalVendaStr};${v.horario}\n`;
+        });
+
+        // Adiciona a linha de total solicitada no final da planilha
+        let valorTotalStr = valorTotalArrecadado.toFixed(2).replace('.', ',');
+        csvContent += `\n;TOTAL GERAL CONSUMIDO/ARRECADADO (Qtd Itens: ${qtdTotalItensConsumidos});${valorTotalStr};-\n`;
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "relatorio_tarde_gelada.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    atualizarTela();
+</script>
+
+</body>
+</html>
